@@ -1,13 +1,53 @@
-
 <style>
-* { box-sizing: border-box; margin: 0; padding: 0; }
-#gameCanvas { display: block; border-radius: 12px; cursor: crosshair; }
-#ui { font-family: var(--font-sans); }
-#controls { display: flex; align-items: center; gap: 14px; padding: 8px 0 4px; flex-wrap: wrap; }
-.btn { background: transparent; border: 0.5px solid var(--border-strong); border-radius: var(--radius); padding: 5px 14px; font-size: 13px; cursor: pointer; color: var(--text-primary); }
-.btn:hover { background: var(--surface-1); }
-.btn.primary { border-color: var(--border-accent); color: var(--text-accent); }
-#statusBar { font-size: 13px; color: var(--text-secondary); padding: 3px 0 0; min-height: 20px; }
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  #gameCanvas {
+    display: block;
+    border-radius: 12px;
+    cursor: crosshair;
+  }
+
+  #ui {
+    font-family: var(--font-sans);
+  }
+
+  #controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 8px 0 4px;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    background: transparent;
+    border: 0.5px solid var(--border-strong);
+    border-radius: var(--radius);
+    padding: 5px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    color: var(--text-primary);
+  }
+
+  .btn:hover {
+    background: var(--surface-1);
+  }
+
+  .btn.primary {
+    border-color: var(--border-accent);
+    color: var(--text-accent);
+  }
+
+  #statusBar {
+    font-size: 13px;
+    color: var(--text-secondary);
+    padding: 3px 0 0;
+    min-height: 20px;
+  }
 </style>
 
 <div id="ui">
@@ -20,306 +60,354 @@
   </div>
 </div>
 
+
+
 <script>
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-const W = canvas.width, H = canvas.height;
+  const canvas = document.getElementById('gameCanvas');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
 
-const wormholeA = { x: 60, y: 60, r: 28, color: '#7F77DD', label: 'A' };
-const wormholeB = { x: W - 60, y: H / 2, r: 28, color: '#1D9E75', label: 'B' };
+  const wormholeA = { x: 60, y: 60, r: 28, color: '#7F77DD', label: 'A' };
+  const wormholeB = { x: W - 60, y: H / 2, r: 28, color: '#1D9E75', label: 'B' };
 
-let blackHoles = [];
-let rocket = null;
-let trail = [];
-let phase = 'setup';
-let currentMass = 5;
-let hoverPos = null;
-let animId = null;
-let lastTime = null;
-let canvasFocused = false;
+  let blackHoles = [];
+  let rocket = null;
+  let trail = [];
+  let phase = 'setup';
+  let currentMass = 5;
+  let hoverPos = null;
+  let animId = null;
+  let lastTime = null;
+  let canvasFocused = false;
+  let rocketSpeed = 110;
 
-function getMassProps(mass) {
-  return { radius: 30 + mass * 14, pull: mass * 22000 };
-}
+  function getMassProps(mass) {
+    return { radius: 30 + mass * 14, pull: mass * 22000 };
+  }
 
-function initRocket() {
-  rocket = { x: wormholeA.x, y: wormholeA.y + wormholeA.r + 6, vx: 0, vy: 110, r: 7 };
-  trail = [];
-}
 
-function setStatus(msg) { document.getElementById('statusBar').textContent = msg; }
+  function initRocket() {
+    rocket = { x: wormholeA.x, y: wormholeA.y + wormholeA.r + 6, vx: 0, vy: rocketSpeed, r: 7 };
+    trail = [];
+  }
 
-function resetLevel() {
-  blackHoles = []; rocket = null; trail = [];
-  phase = 'setup'; currentMass = 5;
-  setStatus('Hover canvas + use ↑↓ to adjust mass, click to place.');
-  if (animId) cancelAnimationFrame(animId);
-  lastTime = null;
-  animId = requestAnimationFrame(loop);
-}
+  function setStatus(msg) { document.getElementById('statusBar').textContent = msg; }
 
-document.getElementById('launchBtn').addEventListener('click', () => {
-  if (phase === 'setup') { phase = 'flying'; initRocket(); setStatus('Rocket launched!'); }
-});
-document.getElementById('clearBtn').addEventListener('click', () => { blackHoles = []; setStatus('Cleared.'); });
-document.getElementById('resetBtn').addEventListener('click', resetLevel);
+  function resetLevel() {
+    blackHoles = []; rocket = null; trail = [];
+    phase = 'setup'; currentMass = 5;
+    setStatus('Hover canvas + use ↑↓ to adjust mass, click to place.');
+    if (animId) cancelAnimationFrame(animId);
+    lastTime = null;
+    animId = requestAnimationFrame(loop);
+  }
 
-canvas.addEventListener('mousemove', e => {
-  const r = canvas.getBoundingClientRect();
-  hoverPos = { x: e.clientX - r.left, y: e.clientY - r.top };
-});
-canvas.addEventListener('mouseleave', () => { hoverPos = null; });
-canvas.addEventListener('mouseenter', () => { canvasFocused = true; });
-canvas.addEventListener('click', e => {
-  if (phase !== 'setup') return;
-  const r = canvas.getBoundingClientRect();
-  const cx = e.clientX - r.left, cy = e.clientY - r.top;
-  if (Math.hypot(cx - wormholeA.x, cy - wormholeA.y) < 50) return;
-  if (Math.hypot(cx - wormholeB.x, cy - wormholeB.y) < 50) return;
-  if (blackHoles.length < 5) blackHoles.push({ x: cx, y: cy, mass: currentMass });
-  else setStatus('Max 5 black holes.');
-});
+  document.getElementById('launchBtn').addEventListener('click', () => {
+    if (phase === 'setup') { phase = 'flying'; initRocket(); setStatus('Rocket launched!'); }
+  });
+  document.getElementById('clearBtn').addEventListener('click', () => { blackHoles = []; setStatus('Cleared.'); });
+  document.getElementById('resetBtn').addEventListener('click', resetLevel);
 
-window.addEventListener('keydown', e => {
-  if (!canvasFocused && !hoverPos) return;
-  if (e.key === 'ArrowUp') { e.preventDefault(); currentMass = Math.min(10, currentMass + 1); }
-  if (e.key === 'ArrowDown') { e.preventDefault(); currentMass = Math.max(1, currentMass - 1); }
-});
-window.addEventListener('mousemove', e => {
-  const r = canvas.getBoundingClientRect();
-  const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
-  canvasFocused = inside;
-});
+  canvas.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    hoverPos = { x: e.clientX - r.left, y: e.clientY - r.top };
+  });
 
-function simulateTrajectory(extraHole) {
-  let x = wormholeA.x, y = wormholeA.y + wormholeA.r + 6;
-  let vx = 0, vy = 110;
-  const pts = [];
-  const dt = 0.04;
-  const holes = extraHole ? [...blackHoles, extraHole] : blackHoles;
-  for (let i = 0; i < 700; i++) {
-    let ax = 0, ay = 0;
-    for (const bh of holes) {
-      const dx = bh.x - x, dy = bh.y - y;
-      const distSq = dx * dx + dy * dy;
-      const dist = Math.sqrt(distSq);
-      const { pull } = getMassProps(bh.mass);
-      const force = pull / (distSq + 1);
-      ax += (dx / dist) * force;
-      ay += (dy / dist) * force;
-      if (dist < getMassProps(bh.mass).radius * 0.25) return { pts, hit: 'black_hole' };
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+
+    const delta = e.deltaY < 0 ? 1.1 : 0.9;
+
+    if (phase === 'flying' && rocket) {
+      rocket.vx *= delta;
+      rocket.vy *= delta;
+    } else {
+      rocketSpeed *= delta;
+      rocketSpeed = Math.max(20, Math.min(300, rocketSpeed));
     }
-    vx += ax * dt; vy += ay * dt;
-    x += vx * dt; y += vy * dt;
-    pts.push([x, y]);
-    if (Math.hypot(x - wormholeB.x, y - wormholeB.y) < wormholeB.r) return { pts, hit: 'win' };
-    if (x < -60 || x > W + 60 || y < -60 || y > H + 60) return { pts, hit: 'out' };
-  }
-  return { pts, hit: 'none' };
-}
+  });
 
-function drawWormhole(wh) {
-  ctx.save();
-  ctx.beginPath(); ctx.arc(wh.x, wh.y, wh.r, 0, Math.PI * 2);
-  ctx.fillStyle = wh.color + '33'; ctx.fill();
-  ctx.strokeStyle = wh.color; ctx.lineWidth = 2; ctx.stroke();
-  ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(wh.label, wh.x, wh.y);
-  ctx.restore();
-}
+  canvas.addEventListener('mouseleave', () => { hoverPos = null; });
+  canvas.addEventListener('mouseenter', () => { canvasFocused = true; });
+  canvas.addEventListener('click', e => {
+    if (phase !== 'setup') return;
+    const r = canvas.getBoundingClientRect();
+    const cx = e.clientX - r.left, cy = e.clientY - r.top;
+    if (Math.hypot(cx - wormholeA.x, cy - wormholeA.y) < 50) return;
+    if (Math.hypot(cx - wormholeB.x, cy - wormholeB.y) < 50) return;
+    if (blackHoles.length < 5) blackHoles.push({ x: cx, y: cy, mass: currentMass });
+    else setStatus('Max 5 black holes.');
+  });
 
-function drawBlackHole(bh, alpha) {
-  const { radius } = getMassProps(bh.mass);
-  ctx.save(); ctx.globalAlpha = alpha ?? 1;
-  ctx.beginPath(); ctx.arc(bh.x, bh.y, radius, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(80,40,140,0.12)'; ctx.fill();
-  ctx.strokeStyle = 'rgba(140,90,220,0.3)'; ctx.lineWidth = 1;
-  ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
-  ctx.beginPath(); ctx.arc(bh.x, bh.y, 8 + bh.mass * 1.4, 0, Math.PI * 2);
-  ctx.fillStyle = '#0a060f'; ctx.fill();
-  ctx.strokeStyle = 'rgba(120,80,200,0.7)'; ctx.lineWidth = 1.5; ctx.stroke();
-  ctx.fillStyle = 'rgba(200,180,255,0.8)'; ctx.font = '11px sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
-  ctx.fillText('m=' + bh.mass, bh.x, bh.y - 10 - bh.mass * 1.4);
-  ctx.restore();
-}
+  window.addEventListener('keydown', e => {
+    if (!canvasFocused && !hoverPos) return;
+    if (e.key === 'ArrowUp') { e.preventDefault(); currentMass = Math.min(10, currentMass + 1); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); currentMass = Math.max(1, currentMass - 1); }
+  });
+  window.addEventListener('mousemove', e => {
+    const r = canvas.getBoundingClientRect();
+    const inside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    canvasFocused = inside;
+  });
 
-function drawTrajectory(pts, hit, alpha) {
-  if (pts.length < 2) return;
-  ctx.save(); ctx.globalAlpha = alpha ?? 0.7;
-  let color = '#888780';
-  if (hit === 'win') color = '#1D9E75';
-  else if (hit === 'black_hole') color = '#E24B4A';
-  else if (hit === 'out') color = '#BA7517';
+  function simulateTrajectory(extraHole, startState = null) {
 
-  for (let i = 1; i < pts.length; i++) {
-    const t = i / pts.length;
-    ctx.strokeStyle = color;
-    ctx.globalAlpha = (alpha ?? 0.7) * t * 0.9;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(pts[i-1][0], pts[i-1][1]);
-    ctx.lineTo(pts[i][0], pts[i][1]);
-    ctx.stroke();
-  }
-  if (hit === 'win') {
-    const last = pts[pts.length - 1];
-    ctx.globalAlpha = alpha ?? 0.7;
-    ctx.beginPath(); ctx.arc(last[0], last[1], 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#1D9E75'; ctx.fill();
-  }
-  ctx.restore();
-}
+    let x, y, vx, vy;
 
-function drawRocket(x, y, angle) {
-  ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
-  ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(5, 7); ctx.lineTo(0, 4); ctx.lineTo(-5, 7); ctx.closePath();
-  ctx.fillStyle = '#FAC775'; ctx.fill();
-  ctx.strokeStyle = '#BA7517'; ctx.lineWidth = 1; ctx.stroke();
-  ctx.restore();
-}
+    if (startState) {
+      x = startState.x;
+      y = startState.y;
+      vx = startState.vx;
+      vy = startState.vy;
+    } else {
+      x = wormholeA.x;
+      y = wormholeA.y + wormholeA.r + 6;
+      vx = 0;
+      vy = rocketSpeed;
+    }
 
-function drawMassHUD() {
-  const x = W - 14, y = H / 2;
-  ctx.save();
-  ctx.fillStyle = 'rgba(255,255,255,0.08)';
-  ctx.beginPath(); ctx.roundRect(x - 52, y - 52, 52, 104, 8); ctx.fill();
 
-  for (let m = 10; m >= 1; m--) {
-    const barY = y - 45 + (10 - m) * 9;
-    const active = m <= currentMass;
-    ctx.fillStyle = active ? `rgba(127,119,221,${0.4 + m * 0.06})` : 'rgba(255,255,255,0.1)';
-    ctx.beginPath(); ctx.roundRect(x - 46, barY, 40, 6, 3); ctx.fill();
+    const pts = [];
+    const dt = 0.04;
+    const holes = extraHole ? [...blackHoles, extraHole] : blackHoles;
+
+    for (let i = 0; i < 700; i++) {
+      let ax = 0, ay = 0;
+      for (const bh of holes) {
+        const dx = bh.x - x, dy = bh.y - y;
+        const distSq = dx * dx + dy * dy;
+        const dist = Math.sqrt(distSq);
+        const { pull } = getMassProps(bh.mass);
+        const force = pull / (distSq + 1);
+        ax += (dx / dist) * force;
+        ay += (dy / dist) * force;
+        if (dist < getMassProps(bh.mass).radius * 0.25) return { pts, hit: 'black_hole' };
+      }
+
+      vx += ax * dt; vy += ay * dt;
+      x += vx * dt; y += vy * dt;
+      pts.push([x, y]);
+      if (Math.hypot(x - wormholeB.x, y - wormholeB.y) < wormholeB.r) return { pts, hit: 'win' };
+      if (x < -60 || x > W + 60 || y < -60 || y > H + 60) return { pts, hit: 'out' };
+    }
+    return { pts, hit: 'none' };
   }
 
-  ctx.fillStyle = 'rgba(200,180,255,0.9)'; ctx.font = 'bold 14px sans-serif';
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText(currentMass, x - 26, y + 56);
-  ctx.fillStyle = 'rgba(160,150,200,0.6)'; ctx.font = '10px sans-serif';
-  ctx.fillText('mass', x - 26, y + 70);
-  ctx.fillText('↑↓', x - 26, y - 60);
-  ctx.restore();
-}
-
-function update(dt) {
-  if (phase !== 'flying') return;
-  const r = rocket;
-  let ax = 0, ay = 0;
-  for (const bh of blackHoles) {
-    const dx = bh.x - r.x, dy = bh.y - r.y;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    const { pull, radius } = getMassProps(bh.mass);
-    if (dist < radius * 0.25) { phase = 'lost'; setStatus('Consumed by a black hole. Reset to try again.'); return; }
-    const force = pull / (dx*dx + dy*dy + 1);
-    ax += (dx/dist)*force; ay += (dy/dist)*force;
-  }
-  r.vx += ax*dt; r.vy += ay*dt;
-  r.x += r.vx*dt; r.y += r.vy*dt;
-  trail.push([r.x, r.y]); if (trail.length > 150) trail.shift();
-  if (Math.hypot(r.x - wormholeB.x, r.y - wormholeB.y) < wormholeB.r) { phase = 'won'; setStatus('Level complete! Rocket reached wormhole B.'); }
-  if (r.x < -50 || r.x > W+50 || r.y < -50 || r.y > H+50) { phase = 'lost'; setStatus('Off course. Reset to try again.'); }
-}
-
-function draw() {
-  ctx.clearRect(0, 0, W, H);
-  ctx.fillStyle = '#0d0a1a';
-  ctx.beginPath(); ctx.roundRect(0, 0, W, H, 12); ctx.fill();
-  for (let i = 0; i < 160; i++) {
-    const sx = (i*397+13)%W, sy = (i*271+77)%H;
-    ctx.fillStyle = `rgba(255,255,255,${0.1 + ((i*53)%60)/180})`;
-    ctx.fillRect(sx, sy, 1, 1);
+  function drawWormhole(wh) {
+    ctx.save();
+    ctx.beginPath(); ctx.arc(wh.x, wh.y, wh.r, 0, Math.PI * 2);
+    ctx.fillStyle = wh.color + '33'; ctx.fill();
+    ctx.strokeStyle = wh.color; ctx.lineWidth = 2; ctx.stroke();
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 13px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(wh.label, wh.x, wh.y);
+    ctx.restore();
   }
 
-  for (const bh of blackHoles) drawBlackHole(bh);
+  function drawBlackHole(bh, alpha) {
+    const { radius } = getMassProps(bh.mass);
+    ctx.save(); ctx.globalAlpha = alpha ?? 1;
+    ctx.beginPath(); ctx.arc(bh.x, bh.y, radius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(80,40,140,0.12)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(140,90,220,0.3)'; ctx.lineWidth = 1;
+    ctx.setLineDash([4, 4]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(bh.x, bh.y, 8 + bh.mass * 1.4, 0, Math.PI * 2);
+    ctx.fillStyle = '#0a060f'; ctx.fill();
+    ctx.strokeStyle = 'rgba(120,80,200,0.7)'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.fillStyle = 'rgba(200,180,255,0.8)'; ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+    ctx.fillText('m=' + bh.mass, bh.x, bh.y - 10 - bh.mass * 1.4);
+    ctx.restore();
+  }
 
-  if (phase === 'setup') {
-    const existingTraj = simulateTrajectory(null);
-    if (blackHoles.length > 0) drawTrajectory(existingTraj.pts, existingTraj.hit, 0.45);
+  function drawTrajectory(pts, hit, alpha) {
+    if (pts.length < 2) return;
+    ctx.save(); ctx.globalAlpha = alpha ?? 0.7;
+    let color = '#888780';
+    if (hit === 'win') color = '#1D9E75';
+    else if (hit === 'black_hole') color = '#E24B4A';
+    else if (hit === 'out') color = '#BA7517';
 
-    if (hoverPos) {
-      const inA = Math.hypot(hoverPos.x - wormholeA.x, hoverPos.y - wormholeA.y) < 50;
-      const inB = Math.hypot(hoverPos.x - wormholeB.x, hoverPos.y - wormholeB.y) < 50;
-      if (!inA && !inB && blackHoles.length < 5) {
-        const ghost = { x: hoverPos.x, y: hoverPos.y, mass: currentMass };
-        drawBlackHole(ghost, 0.5);
-        const traj = simulateTrajectory(ghost);
-        drawTrajectory(traj.pts, traj.hit, 0.85);
+    for (let i = 1; i < pts.length; i++) {
+      const t = i / pts.length;
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = (alpha ?? 0.7) * t * 0.9;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(pts[i - 1][0], pts[i - 1][1]);
+      ctx.lineTo(pts[i][0], pts[i][1]);
+      ctx.stroke();
+    }
+    if (hit === 'win') {
+      const last = pts[pts.length - 1];
+      ctx.globalAlpha = alpha ?? 0.7;
+      ctx.beginPath(); ctx.arc(last[0], last[1], 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#1D9E75'; ctx.fill();
+    }
+    ctx.restore();
+  }
 
-        const hitLabels = { win: 'reaches B!', black_hole: 'absorbed', out: 'escapes', none: '...' };
-        const hitColors = { win: '#5DCAA5', black_hole: '#F09595', out: '#FAC775', none: '#aaa' };
+  function drawRocket(x, y, angle) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(angle);
+    ctx.beginPath(); ctx.moveTo(0, -11); ctx.lineTo(5, 7); ctx.lineTo(0, 4); ctx.lineTo(-5, 7); ctx.closePath();
+    ctx.fillStyle = '#FAC775'; ctx.fill();
+    ctx.strokeStyle = '#BA7517'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawMassHUD() {
+    const x = W - 14, y = H / 2;
+    ctx.save();
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath(); ctx.roundRect(x - 52, y - 52, 52, 104, 8); ctx.fill();
+
+    for (let m = 10; m >= 1; m--) {
+      const barY = y - 45 + (10 - m) * 9;
+      const active = m <= currentMass;
+      ctx.fillStyle = active ? `rgba(127,119,221,${0.4 + m * 0.06})` : 'rgba(255,255,255,0.1)';
+      ctx.beginPath(); ctx.roundRect(x - 46, barY, 40, 6, 3); ctx.fill();
+    }
+
+    ctx.fillStyle = 'rgba(200,180,255,0.9)'; ctx.font = 'bold 14px sans-serif';
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(currentMass, x - 26, y + 56);
+    ctx.fillStyle = 'rgba(160,150,200,0.6)'; ctx.font = '10px sans-serif';
+    ctx.fillText('mass', x - 26, y + 70);
+    ctx.fillText('↑↓', x - 26, y - 60);
+    ctx.restore();
+  }
+
+  function update(dt) {
+    if (phase !== 'flying') return;
+    const r = rocket;
+    let ax = 0, ay = 0;
+    for (const bh of blackHoles) {
+      const dx = bh.x - r.x, dy = bh.y - r.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const { pull, radius } = getMassProps(bh.mass);
+      if (dist < radius * 0.25) { phase = 'lost'; setStatus('Consumed by a black hole. Reset to try again.'); return; }
+      const force = pull / (dx * dx + dy * dy + 1);
+      ax += (dx / dist) * force; ay += (dy / dist) * force;
+    }
+    r.vx += ax * dt; r.vy += ay * dt;
+    r.x += r.vx * dt; r.y += r.vy * dt;
+    trail.push([r.x, r.y]); if (trail.length > 150) trail.shift();
+    if (Math.hypot(r.x - wormholeB.x, r.y - wormholeB.y) < wormholeB.r) { phase = 'won'; setStatus('Level complete! Rocket reached wormhole B.'); }
+    if (r.x < -50 || r.x > W + 50 || r.y < -50 || r.y > H + 50) { phase = 'lost'; setStatus('Off course. Reset to try again.'); }
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = '#0d0a1a';
+    ctx.beginPath(); ctx.roundRect(0, 0, W, H, 12); ctx.fill();
+    for (let i = 0; i < 160; i++) {
+      const sx = (i * 397 + 13) % W, sy = (i * 271 + 77) % H;
+      ctx.fillStyle = `rgba(255,255,255,${0.1 + ((i * 53) % 60) / 180})`;
+      ctx.fillRect(sx, sy, 1, 1);
+    }
+
+    for (const bh of blackHoles) drawBlackHole(bh);
+
+
+    if (phase === 'flying' && rocket) {
+      const future = simulateTrajectory(null, {
+        x: rocket.x,
+        y: rocket.y,
+        vx: rocket.vx,
+        vy: rocket.vy
+      });
+
+      drawTrajectory(future.pts, future.hit, 0.25);
+    }
+
+
+    if (phase === 'setup') {
+      const existingTraj = simulateTrajectory(null);
+      if (blackHoles.length > 0) drawTrajectory(existingTraj.pts, existingTraj.hit, 0.45);
+
+      if (hoverPos) {
+        const inA = Math.hypot(hoverPos.x - wormholeA.x, hoverPos.y - wormholeA.y) < 50;
+        const inB = Math.hypot(hoverPos.x - wormholeB.x, hoverPos.y - wormholeB.y) < 50;
+        if (!inA && !inB && blackHoles.length < 5) {
+          const ghost = { x: hoverPos.x, y: hoverPos.y, mass: currentMass };
+          drawBlackHole(ghost, 0.5);
+          const traj = simulateTrajectory(ghost);
+          drawTrajectory(traj.pts, traj.hit, 0.85);
+
+          const hitLabels = { win: 'reaches B!', black_hole: 'absorbed', out: 'escapes', none: '...' };
+          const hitColors = { win: '#5DCAA5', black_hole: '#F09595', out: '#FAC775', none: '#aaa' };
+          ctx.save();
+          ctx.fillStyle = hitColors[traj.hit];
+          ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
+          ctx.fillText(hitLabels[traj.hit], hoverPos.x + 16, hoverPos.y - 10);
+          ctx.restore();
+        }
+      }
+      drawMassHUD();
+    }
+
+    drawWormhole(wormholeA);
+    drawWormhole(wormholeB);
+
+    if (phase === 'setup') {
+      const a0 = Math.atan2(110, 0) + Math.PI / 2;
+      drawRocket(wormholeA.x, wormholeA.y + wormholeA.r + 10, a0);
+    }
+
+    if (phase === 'flying' || phase === 'won' || phase === 'lost') {
+      if (trail.length > 1) {
         ctx.save();
-        ctx.fillStyle = hitColors[traj.hit];
-        ctx.font = '11px sans-serif'; ctx.textAlign = 'left';
-        ctx.fillText(hitLabels[traj.hit], hoverPos.x + 16, hoverPos.y - 10);
+        for (let i = 1; i < trail.length; i++) {
+          ctx.strokeStyle = `rgba(250,199,117,${(i / trail.length) * 0.6})`;
+          ctx.lineWidth = 1.5; ctx.beginPath();
+          ctx.moveTo(trail[i - 1][0], trail[i - 1][1]); ctx.lineTo(trail[i][0], trail[i][1]);
+          ctx.stroke();
+        }
         ctx.restore();
       }
-    }
-    drawMassHUD();
-  }
-
-  drawWormhole(wormholeA);
-  drawWormhole(wormholeB);
-
-  if (phase === 'setup') {
-    const a0 = Math.atan2(110, 0) + Math.PI/2;
-    drawRocket(wormholeA.x, wormholeA.y + wormholeA.r + 10, a0);
-  }
-
-  if (phase === 'flying' || phase === 'won' || phase === 'lost') {
-    if (trail.length > 1) {
-      ctx.save();
-      for (let i = 1; i < trail.length; i++) {
-        ctx.strokeStyle = `rgba(250,199,117,${(i/trail.length)*0.6})`;
-        ctx.lineWidth = 1.5; ctx.beginPath();
-        ctx.moveTo(trail[i-1][0], trail[i-1][1]); ctx.lineTo(trail[i][0], trail[i][1]);
-        ctx.stroke();
+      if (rocket && phase === 'flying') {
+        const angle = Math.atan2(rocket.vy, rocket.vx) + Math.PI / 2;
+        drawRocket(rocket.x, rocket.y, angle);
       }
+    }
+
+    if (phase === 'won') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(29,158,117,0.2)';
+      ctx.beginPath(); ctx.roundRect(W / 2 - 120, H / 2 - 36, 240, 72, 12); ctx.fill();
+      ctx.fillStyle = '#5DCAA5'; ctx.font = 'bold 22px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Level complete!', W / 2, H / 2 - 8);
+      ctx.fillStyle = 'rgba(180,240,210,0.7)'; ctx.font = '13px sans-serif';
+      ctx.fillText('Reset to play again', W / 2, H / 2 + 18);
       ctx.restore();
     }
-    if (rocket && phase === 'flying') {
-      const angle = Math.atan2(rocket.vy, rocket.vx) + Math.PI/2;
-      drawRocket(rocket.x, rocket.y, angle);
+    if (phase === 'lost') {
+      ctx.save();
+      ctx.fillStyle = 'rgba(162,45,45,0.2)';
+      ctx.beginPath(); ctx.roundRect(W / 2 - 130, H / 2 - 36, 260, 72, 12); ctx.fill();
+      ctx.fillStyle = '#F09595'; ctx.font = 'bold 20px sans-serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText('Mission failed', W / 2, H / 2 - 8);
+      ctx.fillStyle = 'rgba(240,200,200,0.7)'; ctx.font = '13px sans-serif';
+      ctx.fillText('Hit Reset to try again', W / 2, H / 2 + 18);
+      ctx.restore();
     }
-  }
 
-  if (phase === 'won') {
     ctx.save();
-    ctx.fillStyle = 'rgba(29,158,117,0.2)';
-    ctx.beginPath(); ctx.roundRect(W/2-120, H/2-36, 240, 72, 12); ctx.fill();
-    ctx.fillStyle = '#5DCAA5'; ctx.font = 'bold 22px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Level complete!', W/2, H/2-8);
-    ctx.fillStyle = 'rgba(180,240,210,0.7)'; ctx.font = '13px sans-serif';
-    ctx.fillText('Reset to play again', W/2, H/2+18);
-    ctx.restore();
-  }
-  if (phase === 'lost') {
-    ctx.save();
-    ctx.fillStyle = 'rgba(162,45,45,0.2)';
-    ctx.beginPath(); ctx.roundRect(W/2-130, H/2-36, 260, 72, 12); ctx.fill();
-    ctx.fillStyle = '#F09595'; ctx.font = 'bold 20px sans-serif';
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('Mission failed', W/2, H/2-8);
-    ctx.fillStyle = 'rgba(240,200,200,0.7)'; ctx.font = '13px sans-serif';
-    ctx.fillText('Hit Reset to try again', W/2, H/2+18);
+    ctx.fillStyle = 'rgba(200,180,255,0.4)'; ctx.font = '11px sans-serif';
+    ctx.textAlign = 'right';
+    ctx.fillText('A = spawn  B = target  |  max 5 black holes', W - 10, H - 8);
     ctx.restore();
   }
 
-  ctx.save();
-  ctx.fillStyle = 'rgba(200,180,255,0.4)'; ctx.font = '11px sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('A = spawn  B = target  |  max 5 black holes', W-10, H-8);
-  ctx.restore();
-}
+  function loop(ts) {
+    if (!lastTime) lastTime = ts;
+    const dt = Math.min((ts - lastTime) / 1000, 0.05);
+    lastTime = ts;
+    update(dt); draw();
+    animId = requestAnimationFrame(loop);
+  }
 
-function loop(ts) {
-  if (!lastTime) lastTime = ts;
-  const dt = Math.min((ts - lastTime)/1000, 0.05);
-  lastTime = ts;
-  update(dt); draw();
-  animId = requestAnimationFrame(loop);
-}
-
-resetLevel();
+  resetLevel();
 </script>
